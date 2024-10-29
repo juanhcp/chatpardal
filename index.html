@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>WebSocket Chat</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: Arial, sans-serif;
+      height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: url('pardal.jpg') no-repeat center center fixed;
+      background-size: cover;
+      color: #fff;
+    }
+
+    .chat-container {
+      border-radius: 10px;
+      padding: 20px;
+      width: 95%;
+      max-width: 800px;
+      height: 95%;
+      max-height: 90vh;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.7);
+      display: flex;
+      flex-direction: column;
+      background: rgba(0, 0, 0, 0.5);
+    }
+
+    .name-input-container {
+      display: flex;
+      flex-direction: column;
+      margin-bottom: 20px;
+    }
+
+    input[type="text"] {
+      padding: 10px;
+      border-radius: 5px;
+      border: none;
+      margin-bottom: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px;
+      background-color: #4CAF50;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+      font-size: 16px;
+    }
+
+    button:hover {
+      background-color: #45a049;
+    }
+
+    .messages-container {
+      flex: 1;
+      overflow-y: auto;
+      margin-bottom: 20px;
+      padding: 10px;
+      border-radius: 5px;
+      background: rgba(255, 255, 255, 0.1);
+      max-height: 75%;
+    }
+
+    .message-container {
+      margin: 5px 0;
+    }
+
+    .message-bubble {
+      background-color: rgba(52, 152, 219, 0.9);
+      padding: 10px;
+      border-radius: 5px;
+      max-width: 80%;
+      color: #fff;
+      display: inline-block;
+      word-wrap: break-word;
+    }
+
+    .sender-message-container {
+      display: flex;
+      justify-content: flex-end;
+    }
+
+    .sender-message-bubble {
+      background-color: rgba(46, 204, 113, 0.9);
+    }
+
+    .image-message {
+      max-width: 300px; /* Ajustar el tamaño máximo de la imagen */
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div class="chat-container">
+    <div class="name-input-container" id="nameInputContainer">
+      <input type="text" id="nameInput" placeholder="Enter your name pardal" />
+      <button id="joinButton">Join</button>
+    </div>
+    <div class="messages-container" id="messages" style="display: none;"></div>
+    <div class="message-input-container" style="display: none;">
+      <input type="text" id="messageInput" placeholder="Type a message..." />
+      <input type="file" id="fileInput" accept="image/*" />
+      <button id="sendButton">Send</button>
+    </div>
+  </div>
+
+  <script>
+    const messagesDiv = document.getElementById('messages');
+    const messageInput = document.getElementById('messageInput');
+    const sendButton = document.getElementById('sendButton');
+    const nameInput = document.getElementById('nameInput');
+    const nameInputContainer = document.getElementById('nameInputContainer');
+    const fileInput = document.getElementById('fileInput');
+
+    let username = '';
+    const ws = new WebSocket('ws://172.16.0.187:3000');
+
+    document.getElementById('joinButton').addEventListener('click', () => {
+      username = nameInput.value.trim();
+      if (username) {
+        nameInputContainer.style.display = 'none';
+        document.querySelector('.message-input-container').style.display = 'flex';
+        messagesDiv.style.display = 'block';
+      } else {
+        alert('Please enter a name');
+      }
+    });
+
+    ws.addEventListener('message', (event) => {
+      const message = JSON.parse(event.data);
+      displayMessage(message);
+    });
+
+    sendButton.addEventListener('click', () => {
+      sendMessage();
+    });
+
+    messageInput.addEventListener('keypress', (event) => {
+      if (event.key === 'Enter') {
+        sendMessage();
+      }
+    });
+
+    fileInput.addEventListener('change', (event) => {
+      const file = event.target.files[0];
+      if (file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          const imageMessage = {
+            username: username,
+            image: e.target.result
+          };
+          ws.send(JSON.stringify(imageMessage));
+          displayMessage(imageMessage, true);
+        };
+        reader.readAsDataURL(file);
+        fileInput.value = ''; // Limpiar la selección
+      }
+    });
+
+    function sendMessage() {
+      const message = messageInput.value.trim();
+      if (message) {
+        const chatMessage = {
+          username: username,
+          message: message
+        };
+        ws.send(JSON.stringify(chatMessage));
+        displayMessage(chatMessage, true);
+        messageInput.value = '';
+      }
+    }
+
+    function displayMessage(message, isSender = false) {
+      const messageContainer = document.createElement('div');
+      const messageElement = document.createElement('div');
+
+      if (message.image) {
+        const img = document.createElement('img');
+        img.src = message.image;
+        img.classList.add('image-message');
+        messageContainer.appendChild(img);
+      } else {
+        messageElement.textContent = message.username + ': ' + message.message;
+      }
+
+      messageContainer.classList.add('message-container');
+
+      if (isSender) {
+        messageContainer.classList.add('sender-message-container');
+        messageElement.classList.add('message-bubble', 'sender-message-bubble');
+      } else {
+        messageElement.classList.add('message-bubble');
+      }
+
+      if (!message.image) {
+        messageContainer.appendChild(messageElement);
+      }
+      
+      messagesDiv.appendChild(messageContainer);
+      messagesDiv.scrollTop = messagesDiv.scrollHeight; // Desplazar hacia abajo
+    }
+  </script>
+</body>
+</html>
